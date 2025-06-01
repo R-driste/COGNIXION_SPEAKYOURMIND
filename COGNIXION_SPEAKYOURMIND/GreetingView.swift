@@ -7,8 +7,9 @@
 // GreetingView.swift
 
 import SwiftUI
-import Vision
 import AVFoundation
+import ARKit
+import Combine
 
 let synthesizer = AVSpeechSynthesizer()
 private let sessionQueue = DispatchQueue(label: "session queue")
@@ -49,95 +50,63 @@ func speak(_ text: String, mood: VoiceMood = .sad) {
 }
 
 //setup eye tracking using Vision
-class EyeTracker: NSObject, ObservableObject {
-    @Published var gazePoint = CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY) //position of user focus
+class EyeTrackerARKit: NSObject, ObservableObject, ARSessionDelegate {
+    @Published var gazePoint: CGPoint = CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY) //track eyes
     
-    private let captureSession = AVCaptureSession()
-    private let sequenceHandler = VNSequenceRequestHandler()
-    private let queue = DispatchQueue(label: "EyeTrackingQueue")
+    private var arSession = ARSession()
     
-    //start tracking when entering tab
+    override init() {
+        super.init()
+        arSession.delegate = self
+    }
+    
+    //when user enters keyboard tab
     func start() {
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
-            print("No front camera found")
+        guard ARFaceTrackingConfiguration.isSupported else {
+            print("ARFaceTracking not supported.")
             return
         }
-
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            captureSession.beginConfiguration()
-            if captureSession.canAddInput(input) {
-                captureSession.addInput(input)
-            }
-            let output = AVCaptureVideoDataOutput()
-            output.setSampleBufferDelegate(self, queue: queue)
-            if captureSession.canAddOutput(output) {
-                captureSession.addOutput(output)
-            }
-            captureSession.commitConfiguration()
-            sessionQueue.async {
-                self.captureSession.startRunning()
-            }
-        } catch {
-            print("Error setting up camera input: \(error)")
-        }
+        let configuration = ARFaceTrackingConfiguration()
+        arSession.run(configuration, options: [.resetTracking, .removeExistingAnchors])
     }
-
-    //stop tracking when switching tab
+    
+    //when user goes back to home screen
     func stop() {
-        sessionQueue.async {
-            self.captureSession.stopRunning()
-        }
+        arSession.pause()
     }
+    
+    //vector math to get the approximate eye coordinates.
+    func session(_ session: ARSession, didUpdate anchors: [ARAnchor]) {
+        guard let faceAnchor = anchors.first as? ARFaceAnchor else { return }
 
-    private func handleFaceLandmarks(_ landmarks: VNFaceLandmarks2D?, in boundingBox: CGRect) {
-        guard let landmarks = landmarks else { return }
-        let leftPoint = landmarks.leftPupil?.normalizedPoints.first ?? landmarks.leftEye?.normalizedPoints.first
-        let rightPoint = landmarks.rightPupil?.normalizedPoints.first ?? landmarks.rightEye?.normalizedPoints.first
+        let leftEye = faceAnchor.leftEyeTransform
+        let rightEye = faceAnchor.rightEyeTransform
+        
+        let eyeOrigin = simd_make_float4((leftEye.columns.3 + rightEye.columns.3) * 0.5)
+        let leftDir = simd_normalize(simd_make_float4(leftEye.columns.2))
+        let rightDir = simd_normalize(simd_make_float4(rightEye.columns.2))
+        let eyeDirection = simd_normalize((leftDir + rightDir) * 0.5)
 
-        guard let left = leftPoint, let right = rightPoint else { return }
-
-        let avgX = (left.x + right.x) / 2
-        let avgY = (left.y + right.y) / 2
-        let screenWidth = UIScreen.main.bounds.width
-        let screenHeight = UIScreen.main.bounds.height
-
-        let gazeX = (boundingBox.origin.x + avgX * boundingBox.size.width) * screenWidth
-        let gazeY = (1 - (boundingBox.origin.y + avgY * boundingBox.size.height)) * screenHeight
-
+        let distance: Float = 0.4 //estimated distance from the screen
+        let lookAtPoint3D = eyeOrigin + (eyeDirection * distance)
+        
         DispatchQueue.main.async {
-            self.gazePoint = CGPoint(x: gazeX, y: gazeY)
+            self.gazePoint = self.convertToScreen(point3D: lookAtPoint3D) //get 2D from 3D approx
         }
     }
-}
-
-extension EyeTracker: AVCaptureVideoDataOutputSampleBufferDelegate {
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-
-        let request = VNDetectFaceLandmarksRequest { [weak self] request, error in
-            guard let self = self,
-                  let results = request.results as? [VNFaceObservation],
-                  let face = results.first else {
-                return
-            }
-            self.handleFaceLandmarks(face.landmarks, in: face.boundingBox)
-        }
-
-        request.revision = VNDetectFaceLandmarksRequestRevision3
-
-        do {
-            try sequenceHandler.perform([request], on: pixelBuffer)
-        } catch {
-            print("Vision error: \(error)")
-        }
+    
+    private func convertToScreen(point3D: simd_float4) -> CGPoint {
+        let screenSize = UIScreen.main.bounds.size
+        let x = CGFloat(point3D.x + 0.15) / 0.3 * screenSize.width
+        let y = CGFloat(0.2 - point3D.y) / 0.4 * screenSize.height
+        return CGPoint(x: x, y: y)
     }
 }
 
 struct GreetingView: View {
     @Binding var currentTab: Int
     let tabs: [String]
-    @StateObject private var eyeTracker = EyeTracker()
+    @StateObject private var eyeTracker = EyeTrackerARKit()
     
     let phrases = [
         "Hello", "Goodbye", "Yes", "No",
@@ -172,40 +141,42 @@ struct GreetingView: View {
             }
             
             GeometryReader { geo in
-                LazyVGrid(columns: columns, spacing: 15) {
-                    ForEach(phrases, id: \.self)
-                    { phrase in
-                        ZStack {
-                            Button(action: {
-                                analyzeAndSpeak(phrase)
-                            }) {
-                                Label(phrase, systemImage: "arrow.up")
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue.opacity(0.2))
-                                    .cornerRadius(10)
-                            }
-                            .background(
-                                GeometryReader { btnGeo in
-                                    Color.clear
-                                        .onReceive(eyeTracker.$gazePoint) { gaze in
-                                            let btnFrame = btnGeo.frame(in: .global)
-                                            if btnFrame.contains(gaze) {
-                                                startGazeTimer(for: phrase)
-                                            } else if focusedPhrase == phrase {
-                                                cancelGazeTimer()
-                                            }
-                                        }
+                ZStack {
+                    LazyVGrid(columns: columns, spacing: 15) {
+                        ForEach(phrases, id: \.self) { phrase in
+                            ZStack {
+                                Button(action: {
+                                    analyzeAndSpeak(phrase)
+                                }) {
+                                    Label(phrase, systemImage: "arrow.up")
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                        .background(Color.blue.opacity(0.2))
+                                        .cornerRadius(10)
                                 }
-                            )
-                            if focusedPhrase == phrase {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
-                                    .scaleEffect(2.0)
-                                    .frame(width: 40, height: 40)
+                                .background(
+                                    GeometryReader { btnGeo in
+                                        Color.clear
+                                            .onReceive(eyeTracker.$gazePoint) { gaze in
+                                                let btnFrame = btnGeo.frame(in: .global)
+                                                if btnFrame.contains(gaze) {
+                                                    startGazeTimer(for: phrase)
+                                                } else if focusedPhrase == phrase {
+                                                    cancelGazeTimer()
+                                                }
+                                            }
+                                    }
+                                )
+                                if focusedPhrase == phrase {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle())
+                                        .scaleEffect(2.0)
+                                        .frame(width: 40, height: 40)
+                                }
                             }
                         }
                     }
+                    //Move the red gaze point overlay here
                     Circle()
                         .fill(Color.red.opacity(0.7))
                         .frame(width: 30, height: 30)
@@ -213,6 +184,7 @@ struct GreetingView: View {
                         .animation(.easeInOut(duration: 0.1), value: eyeTracker.gazePoint)
                 }
             }
+
         }
         .padding()
         .background(backgroundColor.edgesIgnoringSafeArea(.all))
