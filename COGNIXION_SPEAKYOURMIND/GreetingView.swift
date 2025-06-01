@@ -7,6 +7,42 @@
 
 // GreetingView.swift
 import SwiftUI
+import Vision
+import AVFoundation
+
+let synthesizer = AVSpeechSynthesizer()
+
+//simulate different emotions
+enum VoiceMood {
+    case happy, sad, angry, calm
+}
+func speak(_ text: String, mood: VoiceMood = .sad) {
+    guard !synthesizer.isSpeaking else {
+        print("Already speaking. Wait.")
+        return
+    }
+    
+    print("Speaking this text: \(text)")
+    let utterance = AVSpeechUtterance(string: text)
+    utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+    
+    switch mood {
+        case .happy:
+            utterance.rate = 0.55
+            utterance.pitchMultiplier = 1.3
+        case .sad:
+            utterance.rate = 0.4
+            utterance.pitchMultiplier = 0.8
+        case .angry:
+            utterance.rate = 0.6
+        utterance.pitchMultiplier = 1.05
+        case .calm:
+            utterance.rate = 0.45
+            utterance.pitchMultiplier = 0.9
+        }
+    
+    synthesizer.speak(utterance)
+}
 
 struct GreetingView: View {
     @Binding var currentTab: Int
@@ -53,9 +89,5 @@ struct GreetingView: View {
             }
         }
         .padding()
-    }
-    
-    func speak(_ text: String) {
-        print("Speaking: \(text)")
     }
 }

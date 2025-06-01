@@ -22,7 +22,7 @@ struct MainView: View {
                 .tabItem {
                     Label("Greet", systemImage: "square.and.pencil")
                 }.tag(1)
-            
+             
             LetterView(currentTab: $currentTab, tabs: tabs)
                 .tabItem {
                     Label("Letter", systemImage: "square.and.pencil")

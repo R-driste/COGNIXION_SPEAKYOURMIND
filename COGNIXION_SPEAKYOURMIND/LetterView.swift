@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 struct LetterView: View {
     @Binding var currentTab: Int
@@ -8,9 +9,8 @@ struct LetterView: View {
     @State private var typedText: String = ""
     
     let letterGroups = [
-        "ABC", "DEF",
-        "GHI", "JKL", "MNO",
-        "PQRS", "TUV", "WXYZ"
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O",
+        "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", " "
     ]
     
     let columns = [
@@ -92,9 +92,5 @@ struct LetterView: View {
         print("Entered: \(typedText)")
         speak(typedText)
         typedText = ""
-    }
-    
-    func speak(_ text: String) {
-        print("Speaking: \(text)")
     }
 }
