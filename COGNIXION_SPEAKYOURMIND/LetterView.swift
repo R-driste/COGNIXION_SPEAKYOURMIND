@@ -21,13 +21,8 @@ struct LetterView: View {
     
     var body: some View {
         VStack {
-            Image(systemName: "textformat.abc")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            
-            Text("Letter Options")
-                .font(.title)
-                .padding(.bottom, 10)
+            Image(systemName: "textformat.abc").imageScale(.large).foregroundStyle(.tint)
+            Text("Letter Options").font(.title).padding(.bottom, 10)
             
             HStack(spacing: 20) {
                 Button(action: {
@@ -50,7 +45,6 @@ struct LetterView: View {
             LazyVGrid(columns: columns, spacing: 15) {
                 ForEach(letterGroups, id: \.self) { group in
                     Button(action: {
-                        // Append first letter by default (can expand to cycle)
                         if let firstLetter = group.first {
                             typedText.append(firstLetter)
                         }

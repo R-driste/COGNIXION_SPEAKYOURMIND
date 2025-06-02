@@ -73,7 +73,6 @@ class CameraEmotionManager: NSObject, ObservableObject, AVCapturePhotoCaptureDel
             print("Error capturing photo: \(error?.localizedDescription ?? "unknown error")")
             return
         }
-
         detectEmotion(from: uiImage)
     }
 

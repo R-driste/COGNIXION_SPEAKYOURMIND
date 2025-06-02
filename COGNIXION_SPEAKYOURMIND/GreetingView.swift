@@ -96,8 +96,13 @@ class EyeTrackerARKit: NSObject, ObservableObject, ARSessionDelegate {
     
     private func convertToScreen(point3D: simd_float4) -> CGPoint {
         let screenSize = UIScreen.main.bounds.size
-        let x = CGFloat(point3D.x + 0.15) / 0.3 * screenSize.width
-        let y = CGFloat(0.2 - point3D.y - 0.05) / 0.4 * screenSize.height // ↑ shift by +0.05
+            
+        let xMultiplier: CGFloat = 3 // Increase for more horizontal movement
+        let yMultiplier: CGFloat = 3 // Increase for more vertical movement
+            
+        let x = ((CGFloat(point3D.x + 0.03) / 0.3) * xMultiplier) * screenSize.width
+        let y = ((CGFloat(0.2 - point3D.y - 0.1) / 0.4) * yMultiplier) * screenSize.height
+            
         return CGPoint(x: x, y: y)
     }
 }
@@ -124,7 +129,7 @@ struct GreetingView: View {
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "hand.wave").imageScale(.large).foregroundStyle(.tint)
-            Text("Greeting Options").font(.title).padding(.bottom, 10)
+            Text("Greeting Options").font(.title).foregroundColor(.black).padding(.bottom, 10)
 
             HStack(spacing: 20) {
                 Button { switchToTab(named: "Menu", in: tabs, currentTab: $currentTab)
@@ -218,8 +223,19 @@ struct GreetingView: View {
         focusedPhrase = nil
     }
 
+    @State private var lastSpokenPhrase: String? = nil
+    @State private var canSpeak = true
+
     func analyzeAndSpeak(_ phrase: String) {
-        let mood = detectEmotion()
+        guard canSpeak, phrase != lastSpokenPhrase else {
+            print("Skipping repeated phrase: \(phrase)")
+            return
+        }
+        
+        emotionManager.capturePhoto()
+        let mood = emotionManager.detectedMood
+        print("Mood detected: \(mood)")
+        
         withAnimation {
             backgroundColor = moodColor(for: mood)
         }
@@ -228,16 +244,18 @@ struct GreetingView: View {
                 backgroundColor = .white
             }
         }
+        
         speak(phrase, mood: mood)
+        
+        lastSpokenPhrase = phrase
+        canSpeak = false
+        
+        // Cooldown period, e.g. 3 seconds, adjust as needed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            canSpeak = true
+            lastSpokenPhrase = nil
+        }
     }
-
-    func detectEmotion() -> VoiceMood {
-        emotionManager.capturePhoto()
-        let outcome = emotionManager.detectedMood
-        print("Mood detected: \(outcome)")
-        return outcome
-    }
-
 
     func moodColor(for mood: VoiceMood) -> Color {
         switch mood {
