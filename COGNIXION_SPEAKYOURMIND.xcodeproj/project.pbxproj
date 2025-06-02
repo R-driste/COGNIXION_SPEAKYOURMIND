@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		058A68602DED21C100AB8B21 /* Mentalist in Frameworks */ = {isa = PBXBuildFile; productRef = 058A685F2DED21C100AB8B21 /* Mentalist */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		053682BF2DC5261700D1A266 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				058A68602DED21C100AB8B21 /* Mentalist in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = COGNIXION_SPEAKYOURMIND;
 			packageProductDependencies = (
+				058A685F2DED21C100AB8B21 /* Mentalist */,
 			);
 			productName = COGNIXION_SPEAKYOURMIND;
 			productReference = 053682AD2DC5261500D1A266 /* COGNIXION_SPEAKYOURMIND.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 053682A42DC5261500D1A266;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				058A685E2DED20C400AB8B21 /* XCRemoteSwiftPackageReference "Mentalist" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 053682AE2DC5261500D1A266 /* Products */;
 			projectDirPath = "";
@@ -395,6 +404,7 @@
 				DEVELOPMENT_TEAM = 5D4QXLFP69;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "COGNIXION-SPEAKYOURMIND-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app requires access to the camera for eye tracking functionality.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -434,6 +444,7 @@
 				DEVELOPMENT_TEAM = 5D4QXLFP69;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "COGNIXION-SPEAKYOURMIND-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This app requires access to the camera for eye tracking functionality.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -587,6 +598,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		058A685E2DED20C400AB8B21 /* XCRemoteSwiftPackageReference "Mentalist" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/enebin/Mentalist";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		058A685F2DED21C100AB8B21 /* Mentalist */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 058A685E2DED20C400AB8B21 /* XCRemoteSwiftPackageReference "Mentalist" */;
+			productName = Mentalist;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 053682A52DC5261500D1A266 /* Project object */;
 }

@@ -21,12 +21,11 @@ enum VoiceMood {
 
 //use voice feature to speak input
 func speak(_ text: String, mood: VoiceMood = .sad) {
-    print("Speak works vision fails")
     guard !synthesizer.isSpeaking else {
         print("Already speaking. Wait.") //for debug
         return
     }
-    print("Speaking: \(text)") //for debug
+    print("Speaking This: '\(text)'") //for debug
     let utterance = AVSpeechUtterance(string: text)
     utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
     
@@ -98,7 +97,7 @@ class EyeTrackerARKit: NSObject, ObservableObject, ARSessionDelegate {
     private func convertToScreen(point3D: simd_float4) -> CGPoint {
         let screenSize = UIScreen.main.bounds.size
         let x = CGFloat(point3D.x + 0.15) / 0.3 * screenSize.width
-        let y = CGFloat(0.2 - point3D.y) / 0.4 * screenSize.height
+        let y = CGFloat(0.2 - point3D.y - 0.05) / 0.4 * screenSize.height // ↑ shift by +0.05
         return CGPoint(x: x, y: y)
     }
 }
@@ -107,54 +106,49 @@ struct GreetingView: View {
     @Binding var currentTab: Int
     let tabs: [String]
     @StateObject private var eyeTracker = EyeTrackerARKit()
+    @StateObject private var emotionManager = CameraEmotionManager()
+    
+    @State private var detectedMood: VoiceMood = .calm
+    @State private var backgroundColor: Color = .white
+    
+    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    @State private var gazeTimer: Timer? = nil
+    @State private var focusedPhrase: String? = nil
     
     let phrases = [
         "Hello", "Goodbye", "Yes", "No",
         "Thank You", "No Thank You", "Hahahah", "I'm Tired",
-        "I'm Happy", "I'm in Pain", "Please", "Water"
+        "I'm Happy", "I'm in Pain", "Please", "Water", "Next", "Previous"
     ]
-
-    let columns = [GridItem(.flexible()), GridItem(.flexible())]
-    @State private var gazeTimer: Timer? = nil
-    @State private var focusedPhrase: String? = nil
-    @State private var backgroundColor: Color = .white
 
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "hand.wave")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Greeting Options")
-                .font(.title)
-                .padding(.bottom, 10)
+            Image(systemName: "hand.wave").imageScale(.large).foregroundStyle(.tint)
+            Text("Greeting Options").font(.title).padding(.bottom, 10)
+
             HStack(spacing: 20) {
-                Button(action: {
-                    switchToTab(named: "Menu", in: tabs, currentTab: $currentTab)
-                }) {
-                    Label("Left Tab", systemImage: "arrow.left")
+                Button { switchToTab(named: "Menu", in: tabs, currentTab: $currentTab)
+                } label: { Label("Left Tab", systemImage: "arrow.left")
                 }.padding()
-                Button(action: {
-                    switchToTab(named: "Letter", in: tabs, currentTab: $currentTab)
-                }) {
-                    Label("Right Tab", systemImage: "arrow.right")
+                Button { switchToTab(named: "Letter", in: tabs, currentTab: $currentTab)
+                } label: {Label("Right Tab", systemImage: "arrow.right")
                 }.padding()
             }
-            
+
             GeometryReader { geo in
                 ZStack {
                     LazyVGrid(columns: columns, spacing: 15) {
                         ForEach(phrases, id: \.self) { phrase in
                             ZStack {
-                                Button(action: {
+                                Button {
                                     analyzeAndSpeak(phrase)
-                                }) {
+                                } label: {
                                     Label(phrase, systemImage: "arrow.up")
                                         .frame(maxWidth: .infinity)
                                         .padding()
                                         .background(Color.blue.opacity(0.2))
                                         .cornerRadius(10)
-                                }
-                                .background(
+                                }.background(
                                     GeometryReader { btnGeo in
                                         Color.clear
                                             .onReceive(eyeTracker.$gazePoint) { gaze in
@@ -167,6 +161,7 @@ struct GreetingView: View {
                                             }
                                     }
                                 )
+
                                 if focusedPhrase == phrase {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle())
@@ -176,23 +171,32 @@ struct GreetingView: View {
                             }
                         }
                     }
-                    //Move the red gaze point overlay here
+                    
+                    //eye track cursor
                     Circle()
                         .fill(Color.red.opacity(0.7))
                         .frame(width: 30, height: 30)
                         .position(eyeTracker.gazePoint)
                         .animation(.easeInOut(duration: 0.1), value: eyeTracker.gazePoint)
                 }
+                .frame(width: geo.size.width, height: geo.size.height)
             }
-
-        }
-        .padding()
-        .background(backgroundColor.edgesIgnoringSafeArea(.all))
+        }.padding().background(backgroundColor.edgesIgnoringSafeArea(.all))
         .onAppear {
             eyeTracker.start()
-        }
-        .onDisappear {
+            emotionManager.startSession()
+            emotionManager.onMoodDetected = { mood in
+                withAnimation { backgroundColor = moodColor(for: mood)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                    withAnimation {
+                        backgroundColor = .white
+                    }
+                }
+            }
+        }.onDisappear {
             eyeTracker.stop()
+            emotionManager.stopSession()
             cancelGazeTimer()
         }
     }
@@ -228,8 +232,12 @@ struct GreetingView: View {
     }
 
     func detectEmotion() -> VoiceMood {
-        return [.happy, .sad, .angry, .calm].randomElement()!
+        emotionManager.capturePhoto()
+        let outcome = emotionManager.detectedMood
+        print("Mood detected: \(outcome)")
+        return outcome
     }
+
 
     func moodColor(for mood: VoiceMood) -> Color {
         switch mood {
